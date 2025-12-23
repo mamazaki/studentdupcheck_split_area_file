@@ -1,67 +1,75 @@
-Sub SplitSheetByAreaAndSaveAsFile()
-    Dim mainSheet As Worksheet
-    Dim statusSheet As Worksheet
-    Dim uniqueAreas As Collection
-    Dim areaName As Variant
-    Dim lastRow As Long
-    Dim i As Long
+' *************************************************************
+' Student Data Splitter (Unicode & Sheet Inclusion Support)
+' Purpose: Split student data by Area (Col O) and include Status Reference
+' *************************************************************
+
+Sub SplitDataByAreaWithStatus()
+    Dim wsMain As Worksheet, wsStatus As Worksheet
+    Dim lastRow As Long, i As Long
+    Dim areaList As New Collection
+    Dim areaItem As Variant
     Dim newWB As Workbook
-    Dim folderPath As String
+    Dim savePath As String
     
-    Set mainSheet = ThisWorkbook.Sheets("main")
-    Set statusSheet = ThisWorkbook.Sheets("ข้อมูลสถานะนักเรียนซ้ำซ้อน")
-    Set uniqueAreas = New Collection
+    ' ใช้ Index เพื่อเลี่ยงปัญหา Font ภาษาไทยใน VBE
+    ' สมมติ: Sheet main คือลำดับที่ 1, ข้อมูลสถานะฯ คือลำดับที่ 2
+    Set wsMain = ThisWorkbook.Sheets(1)   
+    Set wsStatus = ThisWorkbook.Sheets(2) 
     
-    ' 1. หาพาธที่จะเซฟไฟล์ (เซฟที่เดียวกับไฟล์หลัก)
-    folderPath = ThisWorkbook.Path & "\"
+    savePath = ThisWorkbook.Path & "\"
+    lastRow = wsMain.Cells(wsMain.Rows.Count, "O").End(xlUp).Row
     
+    ' ปิดระบบแจ้งเตือนเพื่อความรวดเร็ว
     Application.ScreenUpdating = False
     Application.DisplayAlerts = False
     
-    ' 2. ดึงรายชื่อเขตพื้นที่ฯ ที่ไม่ซ้ำกันจาก Column O (เริ่มแถวที่ 2)
-    lastRow = mainSheet.Cells(mainSheet.Rows.Count, "O").End(xlUp).Row
+    ' 1. หา Unique Area Names จาก Column O
     On Error Resume Next
     For i = 2 To lastRow
-        If mainSheet.Cells(i, "O").Value <> "" Then
-            uniqueAreas.Add mainSheet.Cells(i, "O").Value, CStr(mainSheet.Cells(i, "O").Value)
+        If wsMain.Cells(i, "O").Value <> "" Then
+            areaList.Add wsMain.Cells(i, "O").Value, CStr(wsMain.Cells(i, "O").Value)
         End If
     Next i
     On Error GoTo 0
     
-    ' 3. วนลูปสร้างไฟล์ตามรายชื่อเขต
-    For Each areaName In uniqueAreas
+    ' 2. เริ่มขั้นตอนการแยกไฟล์
+    For Each areaItem In areaList
         ' สร้าง Workbook ใหม่
         Set newWB = Workbooks.Add
         
-        ' Copy Sheet แหล่งอ้างอิงไปด้วยเพื่อให้ Validation ไม่พัง
-        statusSheet.Copy Before:=newWB.Sheets(1)
-        newWB.Sheets(1).Visible = xlSheetHidden ' ซ่อนไว้เพื่อความสวยงาม
+        ' --- จุดสำคัญ: Copy Sheet ข้อมูลสถานะนักเรียนซ้ำซ้อน เข้าไปเป็น Sheet แรก ---
+        wsStatus.Copy Before:=newWB.Sheets(1)
+        newWB.Sheets(1).Name = wsStatus.Name ' ตั้งชื่อให้เหมือนต้นฉบับ
+        ' หากต้องการซ่อน Sheet อ้างอิงให้ปลดคอมเมนต์บรรทัดล่างนี้
+        ' newWB.Sheets(1).Visible = xlSheetHidden 
         
-        ' กลับมา Copy ข้อมูลที่กรองแล้ว
-        mainSheet.AutoFilterMode = False
-        mainSheet.Range("A1:R" & lastRow).AutoFilter Field:=15, Criteria1:=areaName
+        ' 3. กรองข้อมูลเฉพาะเขตนั้นๆ
+        wsMain.AutoFilterMode = False
+        wsMain.Range("A1:R" & lastRow).AutoFilter Field:=15, Criteria1:=areaItem
         
-        ' Copy ข้อมูลไปยัง Workbook ใหม่ Sheet ที่ 2
-        mainSheet.Range("A1:R" & lastRow).SpecialCells(xlCellTypeVisible).Copy
+        ' 4. Copy ข้อมูลที่กรองแล้วไปยัง Sheet ที่ 2 ของไฟล์ใหม่
+        wsMain.Range("A1:R" & lastRow).SpecialCells(xlCellTypeVisible).Copy
+        
         With newWB.Sheets(2)
-            .Name = Left(areaName, 30) ' ชื่อ Sheet ตามเขต
-            .Paste Destination:=.Range("A1")
+            .Name = "Main_Data" ' ตั้งชื่อ Sheet ข้อมูล
+            .Range("A1").PasteSpecial xlPasteAll
             .Columns("A:R").AutoFit
         End With
         
-        ' ลบ Sheet ว่างที่เหลือ
-        Do While newWB.Sheets.Count > 2
+        ' ลบ Sheet ที่เกินมา (Excel มักจะสร้างไฟล์ใหม่โดยมี Sheet1 ติดมาด้วย)
+        If newWB.Sheets.Count > 2 Then
             newWB.Sheets(newWB.Sheets.Count).Delete
-        Loop
+        End If
         
-        ' บันทึกไฟล์แยกตามชื่อเขต
-        newWB.SaveAs Filename:=folderPath & areaName & ".xlsx"
+        ' 5. บันทึกไฟล์ (ใช้ชื่อเขตเป็นชื่อไฟล์)
+        newWB.SaveAs Filename:=savePath & areaItem & ".xlsx", FileFormat:=51
         newWB.Close SaveChanges:=False
-    Next areaName
+    Next areaItem
     
-    mainSheet.AutoFilterMode = False
+    ' คืนค่าระบบ
+    wsMain.AutoFilterMode = False
     Application.ScreenUpdating = True
     Application.DisplayAlerts = True
     
-    MsgBox "แยกไฟล์สำเร็จทั้งหมด " & uniqueAreas.Count & " เขต", vbInformation
+    MsgBox "สร้างไฟล์แยกรายเขตเรียบร้อยแล้ว ทั้งหมด " & areaList.Count & " ไฟล์", vbInformation
 End Sub
