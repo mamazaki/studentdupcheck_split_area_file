@@ -9,9 +9,10 @@
 - Export ไฟล์แยกรายเขตเป็นนามสกุล .xlsx
 
 ## วิธีใช้งาน
-1. ตั้งชื่อ Range `A1:A11` ใน Sheet ข้อมูลสถานะนักเรียนซ้ำซ้อน ว่า `StatusList`
-2. กด Alt + F11 > Insert > Module แล้ววาง Code
-3. กดรัน Macro `SplitDataByArea`
+1. ลบ บรรทัดที่ไม่ใช่ข้อมูลออกโดยเฉพาะบรรทัดก่อนหัวคอลัมน์
+2. ตั้งชื่อ Range `A1:A11` ใน Sheet ข้อมูลสถานะนักเรียนซ้ำซ้อน ว่า `StatusList`
+3. กด Alt + F11 > Insert > Module แล้ววาง Code
+4. กดรัน Macro `SplitDataByArea`
 
 หาก code มี ????????? ให้
 1. ไปที่ Control Panel > Region.
